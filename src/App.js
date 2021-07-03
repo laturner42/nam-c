@@ -1,28 +1,16 @@
 import allSettled from 'promise.allsettled';
 allSettled.shim();
-import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState, useReducer, useRef } from 'react';
+import { registerRootComponent } from 'expo';
+import React, { useState } from 'react';
 import {
-  Platform,
   StyleSheet,
-  Text,
-  View,
-  TextInput,
-  KeyboardAvoidingView,
-  TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
-  RefreshControl,
 } from 'react-native';
-import { AntDesign } from '@expo/vector-icons';
-import mtx from 'matrix-js-sdk';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import * as SecureStore from 'expo-secure-store';
 
-import Login from './Login';
-import Home from './Home';
-import Room from './Room';
+import Login from './screens/Login';
+import Home from './screens/Home';
+import Room from './screens/Room';
 
 const Stack = createStackNavigator();
 
@@ -56,3 +44,5 @@ const styles = StyleSheet.create({
     // justifyContent: 'flex-end',
   },
 });
+
+registerRootComponent(App);

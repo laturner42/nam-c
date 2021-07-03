@@ -1,27 +1,12 @@
-import allSettled from 'promise.allsettled';
-allSettled.shim();
-import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState, useReducer, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Button,
-  Platform,
   StyleSheet,
-  Text,
-  View,
   TextInput,
-  KeyboardAvoidingView,
-  TouchableOpacity,
-  ScrollView,
   SafeAreaView,
-  RefreshControl,
 } from 'react-native';
-import { AntDesign } from '@expo/vector-icons';
 import mtx from 'matrix-js-sdk';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
 import * as SecureStore from 'expo-secure-store';
-import RoomSelector from './RoomSelector';
-
 
 export default function Login(props) {
   const {

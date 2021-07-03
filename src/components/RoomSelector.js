@@ -1,30 +1,19 @@
-import allSettled from 'promise.allsettled';
-allSettled.shim();
-import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState, useReducer, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Platform,
   StyleSheet,
   Text,
   View,
-  TextInput,
-  KeyboardAvoidingView,
   TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
-  RefreshControl,
 } from 'react-native';
-import { AntDesign } from '@expo/vector-icons';
-import mtx from 'matrix-js-sdk';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-
+import { getRandomColor } from './utils';
 
 export default function RoomSelector({ room, navigate }) {
   const [members, setMembers] = useState({});
   const [recentMessage, setRecentMessage] = useState({ content: 'Loading' });
+  const [color, setColor] = useState('white')
 
   useEffect(() => {
+    setColor(getRandomColor(room.roomId, 50, 150));
     setMembers(room.getMembers().reduce((out, curr) => {
       out[curr.userId] = curr;
       return out;
@@ -39,7 +28,7 @@ export default function RoomSelector({ room, navigate }) {
       style={{
         width: '100%',
         height: 90,
-        borderBottomColor: '#3f9',
+        borderBottomColor: color,
         borderBottomWidth: 1,
         display: 'flex',
         flexDirection: 'row',
@@ -53,7 +42,7 @@ export default function RoomSelector({ room, navigate }) {
           height: 70,
           borderRadius: 35,
           margin: 10,
-          backgroundColor: '#2eb',
+          backgroundColor: color,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

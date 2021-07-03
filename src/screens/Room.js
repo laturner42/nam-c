@@ -1,5 +1,3 @@
-import allSettled from 'promise.allsettled';
-allSettled.shim();
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState, useReducer, useRef } from 'react';
 import {
@@ -16,13 +14,11 @@ import {
 } from 'react-native';
 import { ProgressBar, Colors } from 'react-native-paper';
 import { AntDesign, Entypo } from '@expo/vector-icons';
-import mtx from 'matrix-js-sdk';
 import moment from 'moment';
 import { HeaderHeightContext } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import { Buffer } from 'buffer';
-import Message from './Message';
-import { getAge } from './utils';
+import Message from '../components/Message';
 
 const roomMessagesReducer = (state, message) => {
   const { messages } = state;
@@ -119,8 +115,11 @@ export default function Room({ route, navigation, client }) {
 
   const isRecent = (i) => {
     if (!i) return false;
-    return messages[i].origin_server_ts - messages[i-1].origin_server_ts < 350000
-      && messages[i].sender === messages[i-1].sender;
+    return (
+      messages[i].origin_server_ts - messages[i-1].origin_server_ts < 350000
+      && messages[i].sender === messages[i-1].sender
+      && moment(messages[i].origin_server_ts).dayOfYear() === moment(messages[i-1].origin_server_ts).dayOfYear()
+    );
   }
 
   const renderList = [];
@@ -136,6 +135,7 @@ export default function Room({ route, navigation, client }) {
             flexDirection: 'row',
             justifyContent: 'center',
             alignItems: 'center',
+            marginTop: 10,
           }}
         >
           <View
@@ -242,6 +242,7 @@ export default function Room({ route, navigation, client }) {
                       <ProgressBar
                         indeterminate={!percentUploaded}
                         progress={percentUploaded}
+                        color={Colors.blue800}
                         style={{
                           height: 5,
                           borderRadius: 5,
@@ -296,6 +297,7 @@ export default function Room({ route, navigation, client }) {
                     borderColor: '#bbb',
                     borderWidth: 1,
                     borderRadius: 15,
+                    fontSize: 16,
                   }}
                 />
                 <TouchableOpacity

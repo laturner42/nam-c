@@ -1,27 +1,12 @@
-import allSettled from 'promise.allsettled';
-allSettled.shim();
-import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState, useReducer, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Dimensions,
-  Platform,
-  StyleSheet,
   Text,
   View,
-  TextInput,
-  KeyboardAvoidingView,
-  TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
-  RefreshControl,
   Image,
 } from 'react-native';
-import { AntDesign } from '@expo/vector-icons';
-import mtx from 'matrix-js-sdk';
 import moment from 'moment';
-import axios from 'axios';
-import { HeaderHeightContext } from '@react-navigation/stack';
-import { Buffer } from 'buffer';
+import { getRandomColor } from './utils';
 
 const imageUrl = (m) => `https://synapse.room409.xyz/_matrix/media/r0/download/${m.content.url.replace('mxc://', '')}`;
 
@@ -34,9 +19,11 @@ export default function Message(props) {
   } = props;
 
   const [mediaDims, setMediaDims] = useState(null);
+  const [nameColor, setNameColor] = useState('rgb(255,255,255)');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setNameColor(getRandomColor(m.sender, 180));
     if (m.content.msgtype === 'm.image') {
       Image.getSize(imageUrl(m), (width, height) => setMediaDims({ width, height }));
     } else {
@@ -113,7 +100,7 @@ export default function Message(props) {
       >
         {
           !fromMe &&
-          <Text style={{ color: '#3f7', fontWeight: 'bold', fontSize: 14 }}>{members[m.sender].rawDisplayName}</Text>
+          <Text style={{ color: nameColor, fontWeight: 'bold', fontSize: 14 }}>{members[m.sender].rawDisplayName}</Text>
         }
           {
             media
