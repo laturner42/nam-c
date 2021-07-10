@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { ActionSheetProvider } from '@expo/react-native-action-sheet'
 
 import Login from './screens/Login';
 import Home from './screens/Home';
@@ -18,21 +19,23 @@ export default function App() {
   const [client, setClient] = useState(null);
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator>
-        <Stack.Screen name="Login">
-          {props => <Login {...props} client={client} setClient={setClient} />}
-        </Stack.Screen>
-        <Stack.Screen name="Chats" options={{
-        animationEnabled: false,
-      }}>
-          {props => <Home {...props} client={client} />}
-        </Stack.Screen>
-        <Stack.Screen name="Room">
-          {props => <Room {...props} client={client} />}
-        </Stack.Screen>
-      </Stack.Navigator>
-    </NavigationContainer>
+    <ActionSheetProvider>
+      <NavigationContainer>
+        <Stack.Navigator>
+          <Stack.Screen name="Login">
+            {props => <Login {...props} client={client} setClient={setClient} />}
+          </Stack.Screen>
+          <Stack.Screen name="Chats" options={{
+          animationEnabled: false,
+        }}>
+            {props => <Home {...props} client={client} />}
+          </Stack.Screen>
+          <Stack.Screen name="Room">
+            {props => <Room {...props} client={client} />}
+          </Stack.Screen>
+        </Stack.Navigator>
+      </NavigationContainer>
+    </ActionSheetProvider>
   );
 }
 

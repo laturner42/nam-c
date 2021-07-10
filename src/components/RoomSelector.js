@@ -5,7 +5,7 @@ import {
   View,
   TouchableOpacity,
 } from 'react-native';
-import { getRandomColor } from './utils';
+import { getRandomColor, getContent } from './utils';
 
 export default function RoomSelector({ room, navigate }) {
   const [members, setMembers] = useState({});
@@ -18,7 +18,9 @@ export default function RoomSelector({ room, navigate }) {
       out[curr.userId] = curr;
       return out;
     }), {});
-    setRecentMessage(room.timeline[room.timeline.length-1].event);
+    if (room.timeline.length > 0) {
+      setRecentMessage(room.timeline[room.timeline.length-1].event);
+    }
   }, [room]);
 
   return (
@@ -60,7 +62,7 @@ export default function RoomSelector({ room, navigate }) {
       <View>
         <Text style={{ color: '#000', fontSize: 17, fontWeight: 'bold' }}>{room.name}</Text>
         {room.timeline.length > 0 && <Text style={{ color: '#333', fontSize: 16 }}>{(members[recentMessage.sender] || {}).rawDisplayName}</Text> }
-        {room.timeline.length > 0 && <Text style={{ color: '#888', fontSize: 14 }}>{recentMessage.content.body}</Text> }
+        {room.timeline.length > 0 && <Text style={{ color: '#888', fontSize: 14 }}>{getContent(recentMessage)}</Text> }
       </View>
     </TouchableOpacity>
   );

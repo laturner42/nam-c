@@ -1,5 +1,30 @@
 import seedrandom from 'seedrandom';
 
+const getContent = (message, oneLiner) => {
+  if (!message) return null;
+  let output; 
+  if (
+    !message.content
+    || !message.content['m.relates_to']
+    || !message.content['m.relates_to']['m.in_reply_to']
+    || !message.content.body.startsWith('>')) {
+    output = (message.content.body || '').trim();
+  } else {
+    const allLines = message.content.body.split('\n');
+    let index = 0;
+    while (allLines[index].startsWith('>')) {
+      index += 1;
+    }
+    output = allLines.slice(index + 1).join('\n');
+  }
+  const maxLength = 30;
+  if (oneLiner && (output.length > maxLength || output.indexOf('\n') >= 0)) {
+    return output.split('\n')[0].substr(0, maxLength) + '...';
+  } else {
+    return output;
+  }
+};
+
 // Crude random color generator 
 const getRandomColor = (seed, minBrightness = 0, maxBrightness = 255) => {
   const rng = seedrandom(seed);
@@ -19,4 +44,5 @@ const getRandomColor = (seed, minBrightness = 0, maxBrightness = 255) => {
 
 module.exports = {
   getRandomColor,
+  getContent,
 }

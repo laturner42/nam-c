@@ -19,14 +19,28 @@ import { HeaderHeightContext } from '@react-navigation/stack';
 import * as ImagePicker from 'expo-image-picker';
 import { Buffer } from 'buffer';
 import Message from '../components/Message';
+import { getRandomColor, getContent } from '../components/utils';
 
-const roomMessagesReducer = (state, message) => {
-  const { messages } = state;
+const handledEvents = ['m.reaction', 'm.room.message'];
+
+const roomMessagesReducer = (state, event) => {
+  if (event.unsigned && event.unsigned.redacted_by) return state;
+  const { messages, reactions } = state;
   const messagesSet = new Set(messages);
-  messagesSet.add(message);
+  // console.log(event, type);
+  if (event.type === 'm.reaction') {
+    const { event_id } = event.content['m.relates_to'];
+    if (!reactions[event_id]) {
+      reactions[event_id] = [];
+    }
+    reactions[event_id].push(event);
+  } else if (event.type === 'm.room.message') {
+    messagesSet.add(event);
+  }
   return {
     ...state,
     messages: [...messagesSet].sort((a, b) => a.origin_server_ts - b.origin_server_ts),
+    reactions,
   }
 };
 
@@ -36,21 +50,38 @@ export default function Room({ route, navigation, client }) {
   } = route.params;
   const activeRoom = client.getRoom(roomId);
   const mainScroller = useRef();
+  const textBox = useRef();
   const [message, setMessage] = useState('');
   const [members, setMembers] = useState({});
   const [percentUploaded, setPercentUploaded] = useState(1);
+  const [replyTo, setReplyTo] = useState(null);
 
-  const [state, dispatch] = useReducer(roomMessagesReducer, { messages: [] });
+  const setReplyToMessage = (message) => {
+    setReplyTo(message);
+    textBox.current.focus();
+  }
+
+  const [state, dispatch] = useReducer(roomMessagesReducer, { messages: [], reactions: {} });
 
   const [distanceToEnd, setDistancetoEnd] = useState(0);
+
+  const lookupRepliedMessage = async (event_id) => await client.fetchRoomEvent(activeRoom.roomId, event_id);
 
   const sendMessage = async () => {
     const content = {
       body: message,
       msgtype: 'm.text',
+    };
+    if (replyTo) {
+      content['m.relates_to'] = {
+        'm.in_reply_to': {
+          event_id: replyTo.event_id,
+        },
+      }
     }
     await client.sendEvent(activeRoom.roomId, "m.room.message", content, "");
     setMessage('');
+    setReplyTo(null);
   }
 
   const uploadImage = async () => {
@@ -61,8 +92,9 @@ export default function Room({ route, navigation, client }) {
 
     setPercentUploaded(0);
 
-    const { base64, cancelled, uri } = await ImagePicker.launchImageLibraryAsync({
+    const { base64, cancelled, uri, width, height } = await ImagePicker.launchImageLibraryAsync({
       base64: true,
+      exif: true,
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
       quality: 1,
@@ -76,23 +108,30 @@ export default function Room({ route, navigation, client }) {
     const data = Buffer.from(base64, "base64");
     const type = uri.substr(uri.lastIndexOf('.') + 1);
 
+    const context = {
+      w: width,
+      h: height,
+      mimetype: `image/${type}`,
+      size: Buffer.byteLength(data),
+    }
+
     const progressHandler = ({ loaded, total }) => setPercentUploaded(loaded/total);
 
     const content_uri = await client.uploadContent(data, { rawResponse: false, type, onlyContentUri: true, progressHandler });
-    await client.sendImageMessage(activeRoom.roomId, content_uri, {}, '');
+    await client.sendImageMessage(activeRoom.roomId, content_uri, context, uri.substr(uri.lastIndexOf('/') + 1));
   }
 
   useEffect(() => {
     let canceled = false;
-    client.on("Room.timeline", (event, room, toStartOfTimeline) => {
+    client.on("Room.timeline", ({ event }, room, toStartOfTimeline) => {
       if (canceled) return;
-      if (event.getType() !== "m.room.message") {
+      if (!handledEvents.includes(event.type)) {
         return; // only use messages
       }
       if (room.roomId === roomId) {
-        dispatch(event.event);
+        dispatch(event);
       } else {
-        alert('you got a message in another room ' + room.name + ' ' + event.event.content.body);
+        alert('you got a message in another room ' + room.name + ' ' + event.content.body);
       }
     });
     return () => { canceled = true; };
@@ -105,13 +144,13 @@ export default function Room({ route, navigation, client }) {
     }), {});
     navigation.setOptions({ title: activeRoom.name });
     activeRoom.timeline
-      .filter(t => t.event.type === 'm.room.message')
+      .filter(t => handledEvents.includes(t.event.type))
       .map(t => {
         dispatch(t.event);
       });
   }, [activeRoom]);
 
-  const { messages } = state;
+  const { messages, reactions } = state;
 
   const isRecent = (i) => {
     if (!i) return false;
@@ -126,6 +165,7 @@ export default function Room({ route, navigation, client }) {
 
   messages.map((m, i) => {
     if (i === 0 || moment(messages[i-1].origin_server_ts).dayOfYear() !== moment(m.origin_server_ts).dayOfYear()) {
+      const ts = moment(m.origin_server_ts);
       renderList.push(
         <View
           key={`time-divider-${m.origin_server_ts}`}
@@ -150,7 +190,7 @@ export default function Room({ route, navigation, client }) {
               paddingRight: 10,
             }}
           >
-            <Text style={{ color: 'white' }} >{moment(m.origin_server_ts).format('MMMM Do YYYY')}</Text>
+            <Text style={{ color: 'white' }} >{ts.dayOfYear() === moment().dayOfYear() ? 'Today' : ts.format('MMMM Do YYYY')}</Text>
           </View>
         </View>
       )
@@ -161,8 +201,11 @@ export default function Room({ route, navigation, client }) {
         message={m}
         fromMe={m.sender === client.getUserId()}
         members={members}
+        reactions={reactions}
         isRecent={isRecent(i)}
         client={client}
+        setReplyTo={setReplyToMessage}
+        lookupRepliedMessage={lookupRepliedMessage}
       />
     )
   });
@@ -176,13 +219,14 @@ export default function Room({ route, navigation, client }) {
               behavior={Platform.OS === "ios" ? "padding" : "height"}
               style={{
                 flex: 1,
+                justifyContent: 'flex-end',
               }}
               keyboardVerticalOffset={headerHeight}
             >
               <ScrollView
                 ref={mainScroller}
                 onContentSizeChange={() => {
-                  if (distanceToEnd < 50) {
+                  if (distanceToEnd < 100) {
                     mainScroller.current.scrollToEnd({ animated: true });
                   }
                 }}
@@ -193,11 +237,13 @@ export default function Room({ route, navigation, client }) {
                     newDistToEnd
                   );
                 }}
+                showsVerticalScrollIndicator={false}
                 invertStickyHeaders
                 keyboardDismissMode="on-drag"
                 style={{
                   backgroundColor: '#f8f8f8',
                   flexDirection: 'column',
+                  borderWidth: 1,
                 }}
                 contentContainerStyle={{
                   justifyContent: 'flex-end',
@@ -216,6 +262,78 @@ export default function Room({ route, navigation, client }) {
                 <StatusBar barStyle="dark-content" />
                 { renderList }
               </ScrollView>
+              {
+                !!replyTo && (
+                  <View
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      // backgroundColor: '#666',
+                      borderTopColor: '#bbb',
+                      borderTopWidth: 1,
+                      borderBottomColor: '#bbb',
+                      borderBottomWidth: 1,
+                      padding: 3,
+                    }}
+                  >
+                    <View
+                      style={{
+                        marginLeft: 45,
+                        display: 'flex',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        maxWidth: '80%',
+                        height: '100%',
+                      }}
+                    >
+                      <View
+                        style={{
+                          borderRadius: 2,
+                          borderWidth: 2,
+                          borderColor: '#666',
+                          height: '90%',
+                          marginRight: 4,
+                        }}
+                      />
+                      <View
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 16,
+                            color: getRandomColor(replyTo.sender, 0, 120),
+                          }}
+                        >
+                          {(members[replyTo.sender] || {}).rawDisplayName || replyTo.sender}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 16,
+                          }}
+                        >
+                          {getContent(replyTo, true)}
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setReplyTo(null)}
+                      style={{
+                        // marginRight: 10,
+                        padding: 10,
+                      }}
+                    >
+                      <AntDesign name="closecircleo" size={22} color="#666" />
+                    </TouchableOpacity>
+                  </View>
+                )
+              }
               {
                 percentUploaded < 1 && (
                   <View
@@ -252,7 +370,7 @@ export default function Room({ route, navigation, client }) {
                   </View>
                 )
               }
-              <View></View>
+              {/* <View></View> */}
               <View
                 style={{
                   width: '100%',
@@ -279,11 +397,12 @@ export default function Room({ route, navigation, client }) {
                   <Entypo name="attachment" size={26} color="#459" />
                 </TouchableOpacity>
                 <TextInput
+                  ref={textBox}
                   value={message}
                   onChangeText={setMessage}
                   multiline
                   onFocus={() => {
-                    if (distanceToEnd < 50) {
+                    if (distanceToEnd < 100) {
                       mainScroller.current.scrollToEnd({ animated: true });
                     }
                   }}
